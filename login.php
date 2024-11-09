@@ -25,18 +25,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Verify the password
         if (password_verify($password, $hashed_password)) {
             // Password is correct, redirect to the dashboard
-            echo "Password valid, redirecting..."; // Tambahkan ini sementar
             $_SESSION['user_id'] = $user_id;
             $_SESSION['email'] = $email;
             header("Location: dashboard.php");
             exit();
         } else {
             // Password is incorrect
-            echo "Invalid password.";
+            echo "<script>alert('Password salah');</script>";
         }
     } else {
         // Email not found
-        echo "No account found with that email.";
+        echo "<script>alert('Email tidak ditemukan');</script>";
     }
 
     // Close the statement and connection

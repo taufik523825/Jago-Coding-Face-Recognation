@@ -6,8 +6,6 @@ if (!isset($_SESSION['user_id'])) {
 }
 include 'koneksi.php';
 
-
-
 $user_id = $_SESSION['user_id'];
 
 // Cek dan tambahkan kolom jika belum ada
@@ -16,9 +14,7 @@ foreach ($requiredColumns as $column) {
   $checkColumn = $conn->query("SHOW COLUMNS FROM `users` LIKE '$column'");
   if ($checkColumn->num_rows == 0) {
     $alterTable = "ALTER TABLE `users` ADD `$column` " . ($column === 'phone' ? "VARCHAR(15)" : ($column === 'bio' ? "TEXT" : "VARCHAR(255)"));
-    if ($conn->query($alterTable) === TRUE) {
-    } else {
-    }
+    $conn->query($alterTable);
   }
 }
 
@@ -33,50 +29,67 @@ $stmt->close();
 
 $errorMessage = '';
 
-// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $user['name'] = $_POST['name'];
-  $user['username'] = $_POST['username'];
-  $user['phone'] = $_POST['phone'];
-  $user['bio'] = $_POST['bio'];
 
-  // Upload logic for profile picture
-  if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
-    $fileType = mime_content_type($_FILES['profile_picture']['tmp_name']);
+  // Logika Hapus Akun
+  if (isset($_POST['delete_account'])) {
+    $deleteSql = "DELETE FROM users WHERE id = ?";
+    $stmt = $conn->prepare($deleteSql);
+    $stmt->bind_param("i", $user_id);
 
-    if (in_array($fileType, $allowedTypes)) {
-      $targetDir = 'uploads/';
-      if (!is_dir($targetDir)) {
-        mkdir($targetDir, 0777, true);
-      }
-
-      $fileName = basename($_FILES['profile_picture']['name']);
-      $targetFile = $targetDir . uniqid() . "_" . $fileName;
-      if (move_uploaded_file($_FILES['profile_picture']['tmp_name'], $targetFile)) {
-        $user['profile_picture'] = $targetFile;
-      } else {
-        $errorMessage = "Gagal mengunggah gambar.";
-      }
+    if ($stmt->execute()) {
+      session_destroy();
+      echo "<script>alert('Akun berhasil dihapus.'); window.location.href = 'register.php';</script>";
+      exit();
     } else {
-      $errorMessage = "Tipe file tidak valid. Hanya gambar yang diizinkan (JPEG, PNG, GIF).";
+      $errorMessage = "Gagal menghapus akun: " . $conn->error;
     }
-  }
-
-  // Update data profil di database
-  $updateSql = "UPDATE users SET name = ?, username = ?, phone = ?, bio = ?, profile_picture = ? WHERE id = ?";
-  $stmt = $conn->prepare($updateSql);
-  $stmt->bind_param("sssssi", $user['name'], $user['username'], $user['phone'], $user['bio'], $user['profile_picture'], $user_id);
-
-  if ($stmt->execute()) {
-    echo "<script>alert('Profil berhasil diperbarui!');</script>";
+    $stmt->close();
   } else {
-    echo "<script>alert('Terjadi kesalahan: " . $conn->error . "');</script>";
-  }
-  $stmt->close();
-}
+    // Logika Simpan Perubahan
+    $user['name'] = $_POST['name'];
+    $user['username'] = $_POST['username'];
+    $user['phone'] = $_POST['phone'];
+    $user['bio'] = $_POST['bio'];
 
+    // Logika Upload Foto Profil
+    if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
+      $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+      $fileType = mime_content_type($_FILES['profile_picture']['tmp_name']);
+
+      if (in_array($fileType, $allowedTypes)) {
+        $targetDir = 'uploads/';
+        if (!is_dir($targetDir)) {
+          mkdir($targetDir, 0777, true);
+        }
+
+        $fileName = basename($_FILES['profile_picture']['name']);
+        $targetFile = $targetDir . uniqid() . "_" . $fileName;
+        if (move_uploaded_file($_FILES['profile_picture']['tmp_name'], $targetFile)) {
+          $user['profile_picture'] = $targetFile;
+        } else {
+          $errorMessage = "Gagal mengunggah gambar.";
+        }
+      } else {
+        $errorMessage = "Tipe file tidak valid. Hanya gambar yang diizinkan (JPEG, PNG, GIF).";
+      }
+    }
+
+    // Update data profil di database
+    $updateSql = "UPDATE users SET name = ?, username = ?, phone = ?, bio = ?, profile_picture = ? WHERE id = ?";
+    $stmt = $conn->prepare($updateSql);
+    $stmt->bind_param("sssssi", $user['name'], $user['username'], $user['phone'], $user['bio'], $user['profile_picture'], $user_id);
+
+    if ($stmt->execute()) {
+      echo "<script>alert('Profil berhasil diperbarui!');</script>";
+    } else {
+      echo "<script>alert('Terjadi kesalahan: " . $conn->error . "');</script>";
+    }
+    $stmt->close();
+  }
+}
 $conn->close();
+
 ?>
 
 
@@ -294,7 +307,7 @@ $conn->close();
       <div class="button-group">
         <button type="submit" class="button" onclick="return confirmSave()">Simpan</button>
         <button type="reset" class="button">Batal</button>
-        <button type="button" class="button" onclick="confirm('Are you sure you want to delete your account?')">Hapus akun</button>
+        <button type="submit" name="delete_account" class="button" onclick="return confirm('Apakah Anda yakin ingin menghapus akun?')">Hapus akun</button>
       </div>
     </form>
   </div>
